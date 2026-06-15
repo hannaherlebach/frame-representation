@@ -22,7 +22,7 @@ B) {B}
 C) {C}
 D) {D}
 
-Answer with only the letter (A, B, C, or D)."""
+Answer with only the letter (A, B, C, or D). You MUST NOT include any other text or reasoning; you must answer DIRECTLY with ONLY your answer letter."""
 
 # Used with extended thinking — model reasons in the thinking block, text output is just the answer.
 QUESTION_TEMPLATE_THINKING = """\

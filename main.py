@@ -146,13 +146,12 @@ def main() -> None:
     n = args.limit or len(dataset)
     print(f"  {n} questions\n")
 
+    thinking_budget = args.thinking_budget or None  # treat 0 as disabled
     all_results: dict[str, dict[str, EvalResult]] = {}
 
     for model_name in args.models:
         print(f"── {model_name} ──")
         model_results: dict[str, EvalResult] = {}
-
-        thinking_budget = args.thinking_budget or None  # treat 0 as disabled
 
         def _run(condition: str, system_prompt) -> EvalResult:
             log_path = run_dir / f"{model_name}__{condition}.jsonl"
@@ -180,8 +179,17 @@ def main() -> None:
 
     results_path = run_dir / "results.json"
     serialisable = {
-        model: {condition: asdict(r) for condition, r in conditions.items()}
-        for model, conditions in all_results.items()
+        "_meta": {
+            "thinking_budget": thinking_budget,
+            "cot": args.cot,
+            "split": args.split,
+            "limit": args.limit,
+            "name": args.name,
+        },
+        **{
+            model: {condition: asdict(r) for condition, r in conditions.items()}
+            for model, conditions in all_results.items()
+        },
     }
     with open(results_path, "w") as f:
         json.dump(serialisable, f, indent=2)
