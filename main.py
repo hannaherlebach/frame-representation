@@ -154,27 +154,24 @@ def main() -> None:
 
         thinking_budget = args.thinking_budget or None  # treat 0 as disabled
 
-        if not args.no_baseline:
+        def _run(condition: str, system_prompt) -> EvalResult:
+            log_path = run_dir / f"{model_name}__{condition}.jsonl"
             result = run_evaluation(
                 model_name, dataset,
-                system_prompt=None,
+                system_prompt=system_prompt,
                 thinking_budget=thinking_budget,
                 cot=args.cot,
                 limit=args.limit,
+                log_path=log_path,
             )
-            model_results["baseline"] = result
-            print(f"  baseline:  {result}")
+            print(f"  {condition}: {result}")
+            return result
+
+        if not args.no_baseline:
+            model_results["baseline"] = _run("baseline", None)
 
         for persona_name in args.personas or []:
-            result = run_evaluation(
-                model_name, dataset,
-                system_prompt=PERSONAS[persona_name],
-                thinking_budget=thinking_budget,
-                cot=args.cot,
-                limit=args.limit,
-            )
-            model_results[persona_name] = result
-            print(f"  {persona_name}: {result}")
+            model_results[persona_name] = _run(persona_name, PERSONAS[persona_name])
 
         all_results[model_name] = model_results
 

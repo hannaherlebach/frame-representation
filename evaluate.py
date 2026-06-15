@@ -1,8 +1,10 @@
 """MMLU abstract algebra data loading and model evaluation."""
 
+import json
 import math
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 from datasets import load_dataset
 from tqdm import tqdm
@@ -104,6 +106,7 @@ def run_evaluation(
     thinking_budget: int | None = None,
     cot: bool = False,
     limit: int | None = None,
+    log_path: Path | None = None,
 ) -> EvalResult:
     """Evaluate a model on the dataset; returns an EvalResult with accuracy and cost."""
     if limit is not None:
@@ -126,7 +129,7 @@ def run_evaluation(
         is_correct = predicted == correct_label
         if is_correct:
             correct += 1
-        completions.append({
+        entry = {
             "system_prompt": system_prompt,
             "prompt": prompt,
             "thinking": thinking,
@@ -134,7 +137,11 @@ def run_evaluation(
             "predicted": predicted,
             "correct_label": correct_label,
             "correct": is_correct,
-        })
+        }
+        completions.append(entry)
+        if log_path is not None:
+            with open(log_path, "a") as f:
+                f.write(json.dumps(entry) + "\n")
 
     scores = [1 if c["correct"] else 0 for c in completions]
     n = len(scores)
