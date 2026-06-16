@@ -1,0 +1,12 @@
+FROM vllm/vllm-openai:latest
+
+# Run as non-root user (FLAIR Rule 1)
+ARG UID
+ARG GID
+RUN groupadd -fo -g $GID myuser && useradd -u $UID -g $GID -m myuser -s /bin/bash
+RUN mkdir -p /app/cache && chown -R myuser:myuser /app/cache
+USER myuser
+
+# HuggingFace cache inside the mounted volume
+ENV HF_HOME=/app/cache
+ENV TRANSFORMERS_CACHE=/app/cache

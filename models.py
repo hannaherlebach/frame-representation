@@ -14,17 +14,21 @@ MODEL_CONFIGS = {
         "cost_per_million": {"input": 3.00, "output": 15.00},
     },
     # ── Open-weights models (cluster) ─────────────────────────────────────────
-    # vLLM exposes an OpenAI-compatible API. Spin up a vLLM server on the
-    # cluster, set VLLM_BASE_URL=http://<host>:<port>/v1, then uncomment:
-    #
+    # Served via vLLM on FLAIR. Set VLLM_BASE_URL=http://localhost:8000/v1
+    # after port-forwarding from the cluster (see Dockerfile.vllm + serve_llama.sh).
+    "llama-3.1-8b": {
+        "provider": "vllm",
+        "model_id": "meta-llama/Llama-3.1-8B-Instruct",
+        "cost_per_million": {"input": 0.0, "output": 0.0},  # gated — needs HF approval
+    },
+    "qwen2.5-7b": {
+        "provider": "vllm",
+        "model_id": "Qwen/Qwen2.5-7B-Instruct",
+        "cost_per_million": {"input": 0.0, "output": 0.0},  # open — no approval needed
+    },
     # "qwen3-32b": {
     #     "provider": "vllm",
     #     "model_id": "Qwen/Qwen3-32B",
-    #     "cost_per_million": {"input": 0.0, "output": 0.0},  # self-hosted
-    # },
-    # "llama-3.3-70b": {
-    #     "provider": "vllm",
-    #     "model_id": "meta-llama/Llama-3.3-70B-Instruct",
     #     "cost_per_million": {"input": 0.0, "output": 0.0},
     # },
 }
@@ -37,12 +41,12 @@ def _get_client(provider: str):
         if provider == "anthropic":
             _clients[provider] = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
-        # elif provider == "vllm":
-        #     from openai import OpenAI
-        #     _clients[provider] = OpenAI(
-        #         api_key="EMPTY",  # vLLM doesn't require a real key
-        #         base_url=os.environ["VLLM_BASE_URL"],
-        #     )
+        elif provider == "vllm":
+            from openai import OpenAI
+            _clients[provider] = OpenAI(
+                api_key="EMPTY",  # vLLM doesn't require a real key
+                base_url=os.environ["VLLM_BASE_URL"],
+            )
 
     return _clients[provider]
 
@@ -114,21 +118,24 @@ def query_model(
 
                 return (text, thinking, response.usage.input_tokens, response.usage.output_tokens)
 
-            # elif provider == "vllm":
-            #     # vLLM doesn't support prefilling via the chat API, so we rely on
-            #     # the "Answer: X" prompt instruction (same format as thinking mode).
-            #     messages = []
-            #     if system_prompt:
-            #         messages.append({"role": "system", "content": system_prompt})
-            #     messages.append({"role": "user", "content": user_prompt})
-            #     response = client.chat.completions.create(
-            #         model=model_id, messages=messages, max_tokens=64,
-            #     )
-            #     return (
-            #         response.choices[0].message.content.strip(),
-            #         response.usage.prompt_tokens,
-            #         response.usage.completion_tokens,
-            #     )
+            elif provider == "vllm":
+                # vLLM serves an OpenAI-compatible chat API. No prefill or
+                # extended thinking — the prompt template handles answer format.
+                messages = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": user_prompt})
+                response = client.chat.completions.create(
+                    model=model_id,
+                    messages=messages,
+                    max_tokens=2048 if cot else 16,
+                )
+                return (
+                    response.choices[0].message.content.strip(),
+                    None,  # no thinking traces for open-weights models
+                    response.usage.prompt_tokens,
+                    response.usage.completion_tokens,
+                )
 
         except Exception as e:
             if attempt == max_retries - 1:

@@ -9,6 +9,5 @@ dependencies = [
     "matplotlib>=3.9.0",
     "python-dotenv>=1.0.0",
     "tqdm>=4.66.0",
-    # Uncomment when running open-weights models via vLLM on the cluster:
-    # "openai>=1.50.0",
+    "openai>=1.50.0",    # for vLLM's OpenAI-compatible API
 ]

@@ -2,3 +2,4 @@
 __pycache__/
 *.pyc
 .python-version
+flair_server_setup_guide.pdf

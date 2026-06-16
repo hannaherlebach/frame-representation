@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from datasets import load_dataset
+from datasets import concatenate_datasets, load_dataset
 from tqdm import tqdm
 
 from models import MODEL_CONFIGS, query_model
@@ -69,9 +69,10 @@ class EvalResult:
         )
 
 
-def load_abstract_algebra(split: str = "test"):
-    """Load the MMLU abstract_algebra split (100 questions in 'test')."""
-    return load_dataset("cais/mmlu", "abstract_algebra", split=split)
+def load_subjects(subjects: list[str], split: str = "test"):
+    """Load and concatenate one or more MMLU subjects."""
+    splits = [load_dataset("cais/mmlu", s, split=split) for s in subjects]
+    return concatenate_datasets(splits) if len(splits) > 1 else splits[0]
 
 
 def format_question(sample: dict, thinking: bool = False, cot: bool = False) -> str:
@@ -117,8 +118,16 @@ def run_evaluation(
     total_output_tokens = 0
     completions = []
 
+    # vLLM can't prefill, so use the "Answer: X" template for its standard mode
+    provider = MODEL_CONFIGS[model_name]["provider"]
+    use_answer_format = provider == "vllm" and not cot and thinking_budget is None
+
     for sample in tqdm(dataset, desc=model_name, leave=False):
-        prompt = format_question(sample, thinking=thinking_budget is not None, cot=cot)
+        prompt = format_question(
+            sample,
+            thinking=thinking_budget is not None or use_answer_format,
+            cot=cot,
+        )
         text, thinking, in_tok, out_tok = query_model(
             model_name, prompt, system_prompt, thinking_budget=thinking_budget, cot=cot
         )
